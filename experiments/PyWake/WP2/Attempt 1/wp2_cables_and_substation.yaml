@@ -1,0 +1,200 @@
+substation:
+  x_m: -844.4852518760845
+  y_m: -787.5897507944509
+  description: Central substation for power collection
+cables:
+- from_turbine_id: 0
+  to_turbine_id: 8
+  description: Connection from T0 to T8
+- from_turbine_id: 8
+  to_turbine_id: 16
+  description: Connection from T8 to T16
+- from_turbine_id: 1
+  to_turbine_id: 9
+  description: Connection from T1 to T9
+- from_turbine_id: 9
+  to_turbine_id: 17
+  description: Connection from T9 to T17
+- from_turbine_id: 9
+  to_turbine_id: 10
+  description: Connection from T9 to T10
+- from_turbine_id: 2
+  to_turbine_id: 3
+  description: Connection from T2 to T3
+- from_turbine_id: 3
+  to_turbine_id: 11
+  description: Connection from T3 to T11
+- from_turbine_id: 11
+  to_turbine_id: 19
+  description: Connection from T11 to T19
+- from_turbine_id: 11
+  to_turbine_id: 12
+  description: Connection from T11 to T12
+- from_turbine_id: 4
+  to_turbine_id: 12
+  description: Connection from T4 to T12
+- from_turbine_id: 12
+  to_turbine_id: 13
+  description: Connection from T12 to T13
+- from_turbine_id: 5
+  to_turbine_id: 13
+  description: Connection from T5 to T13
+- from_turbine_id: 6
+  to_turbine_id: 14
+  description: Connection from T6 to T14
+- from_turbine_id: 14
+  to_turbine_id: 22
+  description: Connection from T14 to T22
+- from_turbine_id: 7
+  to_turbine_id: 15
+  description: Connection from T7 to T15
+- from_turbine_id: 15
+  to_turbine_id: 23
+  description: Connection from T15 to T23
+- from_turbine_id: 16
+  to_turbine_id: 17
+  description: Connection from T16 to T17
+- from_turbine_id: 10
+  to_turbine_id: 18
+  description: Connection from T10 to T18
+- from_turbine_id: 18
+  to_turbine_id: substation
+  description: Connection from T18 to substation
+- from_turbine_id: 19
+  to_turbine_id: substation
+  description: Connection from T19 to substation
+- from_turbine_id: 22
+  to_turbine_id: 23
+  description: Connection from T22 to T23
+- from_turbine_id: 22
+  to_turbine_id: 21
+  description: Connection from T22 to T21
+- from_turbine_id: 24
+  to_turbine_id: 32
+  description: Connection from T24 to T32
+- from_turbine_id: 24
+  to_turbine_id: 25
+  description: Connection from T24 to T25
+- from_turbine_id: 25
+  to_turbine_id: 26
+  description: Connection from T25 to T26
+- from_turbine_id: 26
+  to_turbine_id: substation
+  description: Connection from T26 to substation
+- from_turbine_id: 31
+  to_turbine_id: 39
+  description: Connection from T31 to T39
+- from_turbine_id: 39
+  to_turbine_id: 47
+  description: Connection from T39 to T47
+- from_turbine_id: 33
+  to_turbine_id: 41
+  description: Connection from T33 to T41
+- from_turbine_id: 33
+  to_turbine_id: 34
+  description: Connection from T33 to T34
+- from_turbine_id: 34
+  to_turbine_id: substation
+  description: Connection from T34 to substation
+- from_turbine_id: 34
+  to_turbine_id: 42
+  description: Connection from T34 to T42
+- from_turbine_id: 47
+  to_turbine_id: 46
+  description: Connection from T47 to T46
+- from_turbine_id: 44
+  to_turbine_id: 52
+  description: Connection from T44 to T52
+- from_turbine_id: 52
+  to_turbine_id: 51
+  description: Connection from T52 to T51
+- from_turbine_id: 52
+  to_turbine_id: 60
+  description: Connection from T52 to T60
+- from_turbine_id: 55
+  to_turbine_id: 63
+  description: Connection from T55 to T63
+- from_turbine_id: 63
+  to_turbine_id: 62
+  description: Connection from T63 to T62
+- from_turbine_id: 21
+  to_turbine_id: 20
+  description: Connection from T21 to T20
+- from_turbine_id: 20
+  to_turbine_id: substation
+  description: Connection from T20 to substation
+- from_turbine_id: 32
+  to_turbine_id: 40
+  description: Connection from T32 to T40
+- from_turbine_id: 29
+  to_turbine_id: 28
+  description: Connection from T29 to T28
+- from_turbine_id: 29
+  to_turbine_id: 30
+  description: Connection from T29 to T30
+- from_turbine_id: 28
+  to_turbine_id: substation
+  description: Connection from T28 to substation
+- from_turbine_id: 30
+  to_turbine_id: 38
+  description: Connection from T30 to T38
+- from_turbine_id: 38
+  to_turbine_id: 46
+  description: Connection from T38 to T46
+- from_turbine_id: 40
+  to_turbine_id: 48
+  description: Connection from T40 to T48
+- from_turbine_id: 41
+  to_turbine_id: 49
+  description: Connection from T41 to T49
+- from_turbine_id: 42
+  to_turbine_id: 50
+  description: Connection from T42 to T50
+- from_turbine_id: 43
+  to_turbine_id: 51
+  description: Connection from T43 to T51
+- from_turbine_id: 43
+  to_turbine_id: 35
+  description: Connection from T43 to T35
+- from_turbine_id: 35
+  to_turbine_id: substation
+  description: Connection from T35 to substation
+- from_turbine_id: 37
+  to_turbine_id: 36
+  description: Connection from T37 to T36
+- from_turbine_id: 37
+  to_turbine_id: 45
+  description: Connection from T37 to T45
+- from_turbine_id: 36
+  to_turbine_id: substation
+  description: Connection from T36 to substation
+- from_turbine_id: 45
+  to_turbine_id: 53
+  description: Connection from T45 to T53
+- from_turbine_id: 48
+  to_turbine_id: 56
+  description: Connection from T48 to T56
+- from_turbine_id: 49
+  to_turbine_id: 57
+  description: Connection from T49 to T57
+- from_turbine_id: 50
+  to_turbine_id: 58
+  description: Connection from T50 to T58
+- from_turbine_id: 51
+  to_turbine_id: 59
+  description: Connection from T51 to T59
+- from_turbine_id: 53
+  to_turbine_id: 54
+  description: Connection from T53 to T54
+- from_turbine_id: 56
+  to_turbine_id: 64
+  description: Connection from T56 to T64
+- from_turbine_id: 60
+  to_turbine_id: 61
+  description: Connection from T60 to T61
+- from_turbine_id: 54
+  to_turbine_id: 62
+  description: Connection from T54 to T62
+- from_turbine_id: substation
+  to_turbine_id: 27
+  description: Connection from substation to T27

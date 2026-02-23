@@ -1,0 +1,39 @@
+system:
+  name: WP2_Denmark_Onshore
+  description: Complete IEA Wind Task 37 Case Study for WP2 Onshore Denmark
+  site:
+    latitude: 56.22732285
+    longitude: 8.594398
+    altitude: 85.0
+  wind_farm:
+    name: WP2 Onshore Wind Farm
+    capacity_MW: 325
+    n_turbines: 65
+    grid_capacity_MW: 300
+    power_density_MW_per_km2: 7.0
+    area_km2: 64.06620676701682
+    dimensions:
+      width_km: 8.044134214571661
+      height_km: 7.964338368567146
+  turbine:
+    model: WP2_5MW_GenericTurbine
+    rated_power_MW: 5.0
+    rotor_diameter_m: 161.5270078883401
+    hub_height_m: 120.0
+    specific_power_W_per_m2: 244
+  battery:
+    power_MW: 150
+    energy_MWh: 300
+    duration_hours: 2.0
+  layout:
+    type: optimized
+    coordinates_file: wp2_turbine_coordinates.csv
+    coordinate_system: local_cartesian
+    origin:
+      x_m: 0.0
+      y_m: 0.0
+  cables_and_substation:
+    substation:
+      x_m: -844.4852518760845
+      y_m: -787.5897507944509
+    n_connections: 65

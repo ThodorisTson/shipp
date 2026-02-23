@@ -1,0 +1,83 @@
+site:
+  name: WP2_Denmark_Onshore
+  latitude: 56.22732285
+  longitude: 8.594398
+  altitude: 85.0
+  description: Onshore wind farm in Denmark
+wind_resource:
+  type: weibull
+  reference_height_m: 120.0
+  original_data_height_m: 86.0
+  scaling_method: power_law
+  shear_exponent: 0.20
+  data_source: open-meteo-56.20N8.54E86m.csv
+  sectors:
+  - direction_deg: 15.0
+    weibull_a: 5.778340  # Scaled from 5.411 @ 86m using (120/86)^0.20 = 1.0679
+    weibull_k: 2.936042867583601
+    probability: 0.020776255707762557
+    turbulence_intensity: 0.14
+  - direction_deg: 45.0
+    weibull_a: 7.309314  # Scaled from 6.845 @ 86m
+    weibull_k: 3.4991388692755807
+    probability: 0.03949771689497717
+    turbulence_intensity: 0.14
+  - direction_deg: 75.0
+    weibull_a: 7.745671  # Scaled from 7.253 @ 86m
+    weibull_k: 2.8693851990144923
+    probability: 0.04440639269406393
+    turbulence_intensity: 0.14
+  - direction_deg: 105.0
+    weibull_a: 9.520318  # Scaled from 8.915 @ 86m
+    weibull_k: 2.7209105408894745
+    probability: 0.08276255707762557
+    turbulence_intensity: 0.14
+  - direction_deg: 135.0
+    weibull_a: 9.428790  # Scaled from 8.829 @ 86m
+    weibull_k: 3.11069203070973
+    probability: 0.08732876712328767
+    turbulence_intensity: 0.14
+  - direction_deg: 165.0
+    weibull_a: 9.051390  # Scaled from 8.476 @ 86m
+    weibull_k: 3.0263954758935867
+    probability: 0.06278538812785388
+    turbulence_intensity: 0.14
+  - direction_deg: 195.0
+    weibull_a: 9.828604  # Scaled from 9.203 @ 86m
+    weibull_k: 2.676860463195913
+    probability: 0.08984018264840182
+    turbulence_intensity: 0.14
+  - direction_deg: 225.0
+    weibull_a: 10.134195  # Scaled from 9.490 @ 86m
+    weibull_k: 2.670531772854081
+    probability: 0.12442922374429223
+    turbulence_intensity: 0.14
+  - direction_deg: 255.0
+    weibull_a: 9.475811  # Scaled from 8.871 @ 86m
+    weibull_k: 2.6717660485540358
+    probability: 0.13253424657534246
+    turbulence_intensity: 0.14
+  - direction_deg: 285.0
+    weibull_a: 9.812619  # Scaled from 9.188 @ 86m
+    weibull_k: 2.605680110575971
+    probability: 0.1502283105022831
+    turbulence_intensity: 0.14
+  - direction_deg: 315.0
+    weibull_a: 10.537058  # Scaled from 9.864 @ 86m
+    weibull_k: 2.4396705302737254
+    probability: 0.12694063926940638
+    turbulence_intensity: 0.14
+  - direction_deg: 345.0
+    weibull_a: 6.754833  # Scaled from 6.325 @ 86m
+    weibull_k: 2.427665801706567
+    probability: 0.038470319634703196
+    turbulence_intensity: 0.14
+
+# SCALING NOTES:
+# Original ERA5 data from: open-meteo-56.20N8.54E86m.csv (86m reference height)
+# Target hub height: 120m
+# Scaling method: Power law → ws(z) = ws(z_ref) × (z/z_ref)^α
+# Shear exponent α: 0.20 (onshore terrain)
+# Scaling factor: (120/86)^0.20 = 1.0679 (~6.8% increase)
+# All Weibull A values multiplied by 1.0679
+# Weibull k (shape) unchanged - dimensionless parameter

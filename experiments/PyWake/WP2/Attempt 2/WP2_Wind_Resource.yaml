@@ -1,0 +1,28 @@
+name: WP2 Wind Resource - ERA5 2022 Denmark Onshore
+# -----------------------------------------------------------------
+# This file stores CONFIGURATION and RAW DATA only.
+# All Weibull fitting and height scaling is computed in wp2_common.py
+# so that this file can be swapped for any new met data without
+# touching any Python code.
+#
+# Data source : ERA5 reanalysis via open-meteo
+# CSV file    : open-meteo-56.20N8.54E86m.csv
+# Period      : 2022-01-01 00:00 to 2022-12-31 23:00 (8760 hours)
+# -----------------------------------------------------------------
+
+# Height at which ERA5 wind speed and direction are provided [m]
+h_ref: 86.0
+
+# Wind shear for scaling from h_ref to hub height
+shear:
+  method: power_law           # ws_hub = ws_ref * (h_hub / h_ref) ^ alpha
+  alpha: 0.20                 # Onshore terrain; use 0.14 for offshore
+
+# Weibull sector-fitting configuration (used by wp2_common.py)
+weibull_fit:
+  n_sectors: 12               # 12 × 30° sectors
+  turbulence_intensity: 0.14  # Used for TI in XRSite
+
+# Raw ERA5 hourly time series (exactly as received from meteo)
+# Contains keys:  wind_resource.time, wind_resource.wind_speed, wind_resource.wind_direction
+time_series: !include wind_resource_2022hourly_referenceHPP.yaml

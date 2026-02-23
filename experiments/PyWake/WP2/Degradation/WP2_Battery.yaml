@@ -1,0 +1,32 @@
+name: Battery Storage WP2 HPP v1.0
+# -----------------------------------------------------------------
+# Li-ion battery storage for wind-battery hybrid HPP
+# Sized to match WP2 system specification (wp2_system_iea740.yaml)
+# Format mirrors Jenna's Battery_Reference_HPP.yaml
+# -----------------------------------------------------------------
+battery_systems:
+  technology: lithium-iron-phosphate (LFP) prismatic cell
+  energy_capacity: 600000000.0    # [Wh]  600 MWh usable
+  power_capacity: 300000000.0     # [W]   300 MW peak charge/discharge
+  round_trip_efficiency_nominal: 0.9025   # = 0.95 charge × 0.95 discharge
+  round_trip_efficiency_0.25C: 0.940      # At quarter-rate charge
+  n_full_load_cycles: 4000        # Manufacturer cycle life at 100% DoD
+power_conditioning_unit:
+  efficiency: 0.986
+n_systems: 1
+# Degradation parameters (for nested optimisation framework)
+degradation:
+  chemistry: LFP
+  eol_capacity_fraction: 0.80     # End-of-life at 80% of nominal
+  temperature_C: 25.0
+# Operating limits
+operating_limits:
+  soc_min: 0.05
+  soc_max: 0.95
+  soc_initial: 0.50
+# Economics
+economics:
+  capex_EUR_per_kWh: 150.0
+  opex_EUR_per_kWh_year: 7.0
+  capex_EUR_per_kW: 100.0
+  lifetime_years: 15.0

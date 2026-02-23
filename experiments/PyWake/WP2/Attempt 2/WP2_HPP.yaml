@@ -1,0 +1,11 @@
+name: WP2 Battery Degradation Study HPP v1.0
+site:
+  name: WP2_Denmark_Onshore
+  latitude: 56.22732285
+  longitude: 8.594398
+  altitude: 85.0
+  energy_resource: !include WP2_Wind_Resource.yaml
+wind_farm: !include WP2_Wind_Farm.yaml
+storage_system: !include WP2_Battery.yaml
+electrical_collection_array: !include WP2_Cables.yaml
+grid_connection_capacity: 325000000.0
