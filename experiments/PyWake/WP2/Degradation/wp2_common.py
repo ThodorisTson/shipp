@@ -356,9 +356,10 @@ def load_battery(hpp: dict, verbose: bool = True) -> dict:
         'n_full_load_cycles':   int(bat['n_full_load_cycles']),
         'pcu_efficiency':       float(pcu['efficiency']),
         'n_systems':            int(bs.get('n_systems', 1)),
-        'soc_min':              float(lim.get('soc_min', 0.05)),
-        'soc_max':              float(lim.get('soc_max', 0.95)),
+        'soc_min':              float(lim.get('soc_min', 0.10)),
+        'soc_max':              float(lim.get('soc_max', 0.90)),
         'soc_initial':          float(lim.get('soc_initial', 0.50)),
+        'dod':                  float(lim.get('dod', 0.80)),
         'chemistry':            deg.get('chemistry', 'LFP'),
         'eol_capacity_fraction': float(deg.get('eol_capacity_fraction', 0.80)),
         'temperature_C':         float(deg.get('temperature_C', 25.0)),
@@ -374,7 +375,7 @@ def load_battery(hpp: dict, verbose: bool = True) -> dict:
         print(f"\n✓ Battery: {e_MWh:.0f} MWh / {p_MW:.0f} MW  ({result['technology']})")
         print(f"  RTE             : {result['rte_nominal']*100:.1f}%")
         print(f"  Cycle life      : {result['n_full_load_cycles']:,} cycles")
-        print(f"  SoC limits      : {result['soc_min']*100:.0f}% – {result['soc_max']*100:.0f}%")
+        print(f"  SoC limits      : {result['soc_min']*100:.0f}% – {result['soc_max']*100:.0f}%  (DoD: {result['dod']*100:.0f}%)")
 
     return result
 
@@ -776,4 +777,3 @@ def export_power_timeseries_for_shipp(
 
     df.to_csv(output_path, index=False)
     print(f"✓ Exported {len(df):,} hours → {Path(output_path).name}")
-

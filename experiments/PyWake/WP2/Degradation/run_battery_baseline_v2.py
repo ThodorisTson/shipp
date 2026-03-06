@@ -29,7 +29,7 @@ from shipp.components import Storage, Production, TimeSeries
 
 # WP2
 from wp2_common import quick_setup, get_wake_model
-from degradation_v_2 import count_equivalent_full_cycles
+from degradation_xu import count_equivalent_full_cycles
 
 # PyWake minimal site for time-series runs
 import xarray as xr
@@ -53,16 +53,16 @@ PLOTS_DIR.mkdir(exist_ok=True)
 eur_to_usd = 1.18
 discount_rate = 0.03
 n_year = 20
-p_min = 15.0
+p_min = 0.0 
 dt = 1.0  # hours
 
 # Solver:
 #   'none' => scipy sparse (recommended on Windows for long horizons)
 #   'appsi_highs' => Pyomo HiGHS (good for shorter horizons; may fail for full year depending on feasibility checks)
-pyo_solver = "none"
+pyo_solver = "gurobi"
 
 # Run length
-RUN_FULL_YEAR = False
+RUN_FULL_YEAR = True
 N_DAYS_TEST = 120  # used if RUN_FULL_YEAR=False
 
 # Wake model
@@ -74,6 +74,14 @@ SAVE_REPORT = True
 MAKE_PLOT = True
 
 run_ts = datetime.now().strftime('%Y%m%d_%H%M%S')
+
+def _build_run_label(ts: str, price_csv: Path, p_cap: float, e_cap: float) -> str:
+    """Build a descriptive label for output filenames: {ts}_{dataset}_{pcap}mw_{ecap}mwh"""
+    stem = price_csv.stem.lower()            # e.g. "dk1_prices_2022"
+    year = ''.join(filter(str.isdigit, stem))[-4:]   # last 4 digits = year
+    dataset = f"dk{year}"
+    bat = f"{int(round(p_cap))}mw_{int(round(e_cap))}mwh"
+    return f"{ts}_{dataset}_{bat}"
 
 # =============================================================================
 # Helpers
@@ -231,7 +239,18 @@ def main() -> None:
     print(f"  RTE(ac): {rte_ac*100:.1f}%")
     print(f"  Solver: {('scipy sparse' if pyo_solver == 'none' else pyo_solver)}")
 
-    stor = Storage(e_cap=e_cap, p_cap=p_cap, eff_in=1.0, eff_out=eta, e_cost=e_cost, p_cost=p_cost)
+    run_label = _build_run_label(run_ts, PRICE_CSV, p_cap, e_cap)
+
+    # solve_lp_sparse does not support dod < 1.0 (SHIPP v1.2.0 limitation).
+    dod_yaml = float(bat.get('dod', 0.80))
+    if pyo_solver == "none":
+        dod_eff = 1.0
+        print(f"  ⚠ DoD constraint ({dod_yaml:.0%}) not supported by scipy sparse — running unconstrained (dod=1.0).")
+    else:
+        dod_eff = dod_yaml
+        print(f"  DoD constraint: {dod_eff:.0%} (enforced by {pyo_solver})")
+
+    stor = Storage(e_cap=e_cap, p_cap=p_cap, eff_in=1.0, eff_out=eta, e_cost=e_cost, p_cost=p_cost, dod=dod_eff)
     stor_null = Storage(e_cap=0.0, p_cap=0.0, eff_in=1.0, eff_out=1.0, e_cost=0.0, p_cost=0.0)
 
     price_usd = (price_eur * eur_to_usd).tolist()
@@ -247,7 +266,7 @@ def main() -> None:
         os_fixed = solve_lp_sparse(price_dam, prod, prod_null, stor, stor_null, discount_rate, n_year, p_min, p_max, n, fixed_cap=True)
     else:
         os = solve_lp_pyomo(price_dam, prod, prod_null, stor, stor_null, discount_rate, n_year, p_min, p_max, n, pyo_solver)
-        os_fixed = solve_lp_pyomo(price_dam, prod, prod_null, stor, stor_null, discount_rate, n_year, p_min, p_max, n, pyo_solver, fixed_cap=True)
+        os_fixed = solve_lp_pyomo(price_dam, prod, prod_null, stor, stor_null, discount_rate, n_year, p_min, p_max, n, pyo_solver, fixed_cap=True, return_duals=True)
 
     # Wind-only baseline revenue (same as Example 2 idea)
     revenues_res_only = 365.0 * 24.0 / n * np.dot(price_eur, np.minimum(power_wind_MW, p_max)) * dt
@@ -275,10 +294,10 @@ def main() -> None:
 
     print("                P_min [MW]      Revenue [kUSD]  Rev. increase   p_cap/e_cap             Cost [M.USD]    Tot NPV [M.USD]")
     print("-" * 100)
-    print(f"Sizing Opt.     {p_min:<14.1f}{os.revenue*1e-3:<15.1f}{rev_inc_pct(os.revenue):<14.2f}%"
+    print(f"Sizing Opt.     {p_min:<14.1f}{os.annual_revenue*1e-3:<15.1f}{rev_inc_pct(os.annual_revenue):<14.2f}%"
           f"   {os.storage_list[0].p_cap:>8.2f}/{os.storage_list[0].e_cap:<8.2f}"
           f"        {-os.a_npv:>10.2f}        {os.npv:>10.1f}")
-    print(f"Dispatch only   {p_min:<14.1f}{os_fixed.revenue*1e-3:<15.1f}{rev_inc_pct(os_fixed.revenue):<14.2f}%"
+    print(f"Dispatch only   {p_min:<14.1f}{os_fixed.annual_revenue*1e-3:<15.1f}{rev_inc_pct(os_fixed.annual_revenue):<14.2f}%"
           f"   {os_fixed.storage_list[0].p_cap:>8.2f}/{os_fixed.storage_list[0].e_cap:<8.2f}"
           f"        {-os_fixed.a_npv:>10.2f}        {os_fixed.npv:>10.1f}")
     print("-" * 100)
@@ -293,7 +312,7 @@ def main() -> None:
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
     if SAVE_CSV:
-        results_file = RESULTS_DIR / "battery_optimization_results.csv"
+        results_file = RESULTS_DIR / f"battery_optimization_results_{run_label}.csv"
         rows = [
             {
                 "timestamp": timestamp,
@@ -301,8 +320,8 @@ def main() -> None:
                 "days_simulated": n / 24.0,
                 "optimization_type": "sizing",
                 "p_min_MW": p_min,
-                "revenue_kUSD": os.revenue * 1e-3,
-                "revenue_increase_pct": rev_inc_pct(os.revenue),
+                "revenue_kUSD": os.annual_revenue * 1e-3,
+                "revenue_increase_pct": rev_inc_pct(os.annual_revenue),
                 "p_cap_MW": os.storage_list[0].p_cap,
                 "e_cap_MWh": os.storage_list[0].e_cap,
                 "cost_MUSD": -os.a_npv,
@@ -320,8 +339,8 @@ def main() -> None:
                 "days_simulated": n / 24.0,
                 "optimization_type": "dispatch_fixed",
                 "p_min_MW": p_min,
-                "revenue_kUSD": os_fixed.revenue * 1e-3,
-                "revenue_increase_pct": rev_inc_pct(os_fixed.revenue),
+                "revenue_kUSD": os_fixed.annual_revenue * 1e-3,
+                "revenue_increase_pct": rev_inc_pct(os_fixed.annual_revenue),
                 "p_cap_MW": os_fixed.storage_list[0].p_cap,
                 "e_cap_MWh": os_fixed.storage_list[0].e_cap,
                 "cost_MUSD": -os_fixed.a_npv,
@@ -338,7 +357,7 @@ def main() -> None:
         print(f"\n✓ Results saved to: {results_file}")
 
     if SAVE_REPORT:
-        report_file = RESULTS_DIR / f"battery_report_{run_ts}.txt"
+        report_file = RESULTS_DIR / f"battery_report_{run_label}.txt"
         with open(report_file, "w", encoding="utf-8") as f:
             f.write("=" * 80 + "\n")
             f.write("WP2 BATTERY OPTIMIZATION REPORT\n")
@@ -374,8 +393,8 @@ def main() -> None:
             f.write(f"Wind-only baseline revenue: {revenues_res_only*1e-3:.1f} kUSD\n\n")
 
             f.write("Sizing optimization:\n")
-            f.write(f"  Revenue: {os.revenue*1e-3:.1f} kUSD\n")
-            f.write(f"  Revenue increase: {rev_inc_pct(os.revenue):.2f}%\n")
+            f.write(f"  Revenue: {os.annual_revenue*1e-3:.1f} kUSD\n")
+            f.write(f"  Revenue increase: {rev_inc_pct(os.annual_revenue):.2f}%\n")
             f.write(f"  Optimal battery: {os.storage_list[0].p_cap:.1f} MW / {os.storage_list[0].e_cap:.1f} MWh\n")
             f.write(f"  Cost: {-os.a_npv:.2f} MUSD\n")
             f.write(f"  NPV: {os.npv:.2f} MUSD\n")
@@ -383,8 +402,8 @@ def main() -> None:
 
             f.write("Fixed capacity dispatch:\n")
             f.write(f"  Fixed battery: {p_cap:.1f} MW / {e_cap:.1f} MWh\n")
-            f.write(f"  Revenue: {os_fixed.revenue*1e-3:.1f} kUSD\n")
-            f.write(f"  Revenue increase: {rev_inc_pct(os_fixed.revenue):.2f}%\n")
+            f.write(f"  Revenue: {os_fixed.annual_revenue*1e-3:.1f} kUSD\n")
+            f.write(f"  Revenue increase: {rev_inc_pct(os_fixed.annual_revenue):.2f}%\n")
             f.write(f"  Cost: {-os_fixed.a_npv:.2f} MUSD\n")
             f.write(f"  NPV: {os_fixed.npv:.2f} MUSD\n")
             f.write(f"  EFC in period: {cycles_fixed:.2f} (≈ {cycles_fixed_per_year:.0f}/year)\n\n")
@@ -416,7 +435,7 @@ def main() -> None:
         ax[1].legend()
 
         plt.tight_layout()
-        out_png = PLOTS_DIR / f"battery_optimization_results_{run_ts}.png"
+        out_png = PLOTS_DIR / f"battery_optimization_results_{run_label}.png"
         plt.savefig(out_png, dpi=200)
         print(f"✓ Saved: {out_png.name}")
         plt.show()

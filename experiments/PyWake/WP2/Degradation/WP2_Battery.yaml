@@ -6,8 +6,8 @@ name: Battery Storage WP2 HPP v1.0
 # -----------------------------------------------------------------
 battery_systems:
   technology: lithium-iron-phosphate (LFP) prismatic cell
-  energy_capacity: 600000000.0    # [Wh]  600 MWh usable
-  power_capacity: 300000000.0     # [W]   300 MW peak charge/discharge
+  energy_capacity: 300000000.0    # [Wh]  300 MWh usable
+  power_capacity: 150000000.0     # [W]   150 MW peak charge/discharge
   round_trip_efficiency_nominal: 0.9025   # = 0.95 charge × 0.95 discharge
   round_trip_efficiency_0.25C: 0.940      # At quarter-rate charge
   n_full_load_cycles: 4000        # Manufacturer cycle life at 100% DoD
@@ -21,9 +21,10 @@ degradation:
   temperature_C: 25.0
 # Operating limits
 operating_limits:
-  soc_min: 0.05
-  soc_max: 0.95
+  soc_min: 0.10
+  soc_max: 0.90
   soc_initial: 0.50
+  dod: 0.8
 # Economics
 economics:
   capex_EUR_per_kWh: 150.0
