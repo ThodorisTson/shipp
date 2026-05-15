@@ -17,7 +17,7 @@ n_systems: 1
 # Degradation parameters (for nested optimisation framework)
 degradation:
   chemistry: LFP
-  eol_capacity_fraction: 0.80     # End-of-life at 80% of nominal
+  eol_capacity_fraction: 0.70     # End-of-life at 80% of nominal
   temperature_C: 25.0
 # Operating limits
 operating_limits:
