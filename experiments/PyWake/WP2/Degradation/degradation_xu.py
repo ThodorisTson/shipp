@@ -922,6 +922,101 @@ def analyze_degradation(
         },
     }
 
+# =============================================================================
+# Interactive convexity self-test
+# =============================================================================
+
+def _check_sdelta_convexity(soc_min: float | None = None,
+                             soc_max: float | None = None,
+                             n_points: int = 200_000) -> None:
+    """Interactive numerical verification that Xu S_δ is NOT globally convex.
+
+    If soc_min / soc_max are not provided, prompts the user to enter them.
+    max_dod = soc_max - soc_min sets the ceiling on physically reachable
+    cycle depths given the LP SoC constraints.
+    """
+    if soc_min is None or soc_max is None:
+        print("\n=== Xu S_δ interactive convexity check ===")
+        print("Enter the SoC operating window used in your LP runs.")
+        print("(e.g. soc_min=0.10, soc_max=0.90 for the WP2 baseline)\n")
+        try:
+            soc_min = float(input("  soc_min [0–1]: ").strip())
+            soc_max = float(input("  soc_max [0–1]: ").strip())
+        except (ValueError, EOFError) as exc:
+            raise SystemExit(f"Invalid input: {exc}") from exc
+
+    if not (0.0 <= soc_min < soc_max <= 1.0):
+        raise ValueError(f"Need 0 ≤ soc_min < soc_max ≤ 1, got [{soc_min}, {soc_max}]")
+
+    max_dod = round(soc_max - soc_min, 10)
+
+    # --- Compute S_δ'' numerically ---
+    delta = np.linspace(1e-4, 1.0, n_points)
+    D  = XU_LMO.k_delta1 * delta ** XU_LMO.k_delta2 + XU_LMO.k_delta3
+    Dp = XU_LMO.k_delta1 * XU_LMO.k_delta2 * delta ** (XU_LMO.k_delta2 - 1)
+    d1 = -Dp / D**2
+    d2 = np.gradient(d1, delta)
+
+    # Global inflection point
+    sign_changes = np.where(np.diff(np.sign(d2)))[0]
+    boundary = float(delta[sign_changes[0]]) if len(sign_changes) > 0 else None
+
+    # --- Report ---
+    print(f"\n{'─'*70}")
+    print(f"Step 7 — Interactive convexity check")
+    print(f"{'─'*70}")
+    print(f"  Operating window : soc_min={soc_min},  soc_max={soc_max}")
+    print(f"  Max cycle depth  : max_dod = {max_dod:.4f}")
+    print(f"  Shi fitting window lower bound: 0.15 (convexity boundary)")
+    print()
+
+    if boundary is not None:
+        print(f"  Global d²S_δ/dδ² sign change at δ ≈ {boundary:.4f}")
+        print(f"    S_δ NON-CONVEX for δ < {boundary:.4f}")
+        print(f"    S_δ CONVEX     for δ > {boundary:.4f}")
+    else:
+        print("  WARNING: No sign change found — verify LMO parameters.")
+
+    print()
+
+    # Full reachable range [0, max_dod]
+    mask_full = delta <= max_dod
+    n_nc_full = int(np.sum(d2[mask_full] < 0))
+    frac_full = n_nc_full / mask_full.sum()
+    tag_full  = "NON-CONVEX ✗" if n_nc_full > 0 else "CONVEX ✓"
+    print(f"  [0,    {max_dod:.2f}]  (full reachable range) → {tag_full}")
+    if n_nc_full > 0:
+        print(f"    {n_nc_full:,} / {mask_full.sum():,} sample points have d²S/dδ² < 0  "
+              f"({frac_full*100:.1f}%)")
+
+    # Shi fitting window [0.15, max_dod]
+    if max_dod > 0.15:
+        mask_fit  = (delta >= 0.15) & (delta <= max_dod)
+        n_nc_fit  = int(np.sum(d2[mask_fit] < 0))
+        tag_fit   = "NON-CONVEX ✗" if n_nc_fit > 0 else "CONVEX ✓"
+        print(f"  [0.15, {max_dod:.2f}]  (Shi fitting window)   → {tag_fit}")
+        if n_nc_fit > 0:
+            print(f"    WARNING: {n_nc_fit:,} non-convex points inside fitting window — "
+                  "lower bound must be raised.")
+    else:
+        print(f"  [0.15, {max_dod:.2f}]  Skipped — max_dod ≤ 0.15")
+
+    # Dual-Φ architecture verdict
+    print()
+    print("  --- Dual-Φ architecture verdict ---")
+    if boundary is None:
+        print("  INCONCLUSIVE — could not locate non-convex boundary.")
+    elif boundary >= max_dod:
+        print(f"  NOTE: boundary ({boundary:.4f}) ≥ max_dod ({max_dod:.4f}).")
+        print("  S_δ is convex over the full reachable range for this window.")
+        print("  Dual-Φ split is conservative but not strictly required here.")
+    elif boundary >= 0.15:
+        print(f"  CRITICAL: boundary ({boundary:.4f}) is inside fitting window [0.15, {max_dod:.2f}].")
+        print("  Dual-Φ is required AND fitting window lower bound must be raised.")
+    else:
+        print(f"  OK: boundary ({boundary:.4f}) < fitting window lower bound (0.15).")
+        print("  Φ_shi is fitted and evaluated entirely in the convex region of S_δ.")
+        print("  Dual-Φ architecture assumption HOLDS. ✓")
 
 # =============================================================================
 # Self-test
@@ -1065,6 +1160,11 @@ if __name__ == "__main__":
     print(f"  SoH = {(1-_L)*100:.3f}%")
     print(f"  Xu Phi unchanged by Shi swap ✓")
 
+    # ------------------------------------------------------------------
+    # 7. Interactive convexity check — user supplies the SoC window
+    # ------------------------------------------------------------------
+    _check_sdelta_convexity()
+    
     # ------------------------------------------------------------------
     # Summary
     # ------------------------------------------------------------------

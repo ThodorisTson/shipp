@@ -1,0 +1,5 @@
+Farm,Turbine,# Turbines,Total Capacity (MW),Mean Wind Speed (m/s),Weibull A (m/s),Weibull k,Gross AEP (GWh/yr),Losses (%),Net AEP (GWh/yr),Capacity Factor (%)
+Borssele I & II,Siemens Gamesa SG 8.0-167 DD,94,752.0,8.94,10.06,2.656,3781.4,18.9,3066.4,46.5
+Borssele III,Vestas V164-9.5 MW,77,731.5,9.04,10.17,2.658,3295.0,18.9,2672.0,41.7
+Borssele IV,Vestas V164-9.5 MW,2,19.0,9.01,10.14,2.659,85.2,18.9,69.1,41.5
+✅ TOTAL,,173,1502.5,,,,7161.5,18.9,5807.4,

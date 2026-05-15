@@ -26,7 +26,7 @@ from shipp.timeseries import TimeSeries
 from shipp.kernel import os_rule_based
 import warnings
 
-def solve_lp_pyomo(price_ts: TimeSeries, prod1: Production, prod2: Production, stor1: Storage, stor2: Storage, discount_rate: float, n_year: int, p_min: float, p_max: float, n: int, name_solver: str = 'mosek', fixed_cap: bool = False, dp_lim = None,     alpha_obj: float = DEFAULT_ALPHA_OBJ, verbose = False, return_duals: bool = False, soc_max1: float = 1.0, soc_max2: float = 1.0) -> OpSchedule:
+def solve_lp_pyomo(price_ts: TimeSeries, prod1: Production, prod2: Production, stor1: Storage, stor2: Storage, discount_rate: float, n_year: int, p_min: float, p_max: float, n: int, name_solver: str = 'mosek', fixed_cap: bool = False, dp_lim = None,     alpha_obj: float = DEFAULT_ALPHA_OBJ, verbose = False, return_duals: bool = False, soc_max1: float = 1.0, soc_max2: float = 1.0, e_start1: float = None) -> OpSchedule:
     """Build and solve an integrated dispatch NPV maximization with pyomo as a linear program.
 
     This function builds and solves the hybrid sizing and operation problem as a linear program. The objective is to minimize the Net Present Value of the plant. The optimization problem finds the optimal energy and power capacity of two storage systems and their optimal dispatch. In this function, the input for the power production represented by two Production objects. The problem can be constrained by a baseload power production constraint or a ramp limitation constraint.
@@ -203,8 +203,12 @@ def solve_lp_pyomo(price_ts: TimeSeries, prod1: Production, prod2: Production, s
         return model.p_cur[i] <= power_res[i]
 
     # Constraint for each storage type
-    model.e_start_end1 =pyo.Constraint(expr = model.e_vec1[0]==model.e_vec1[n])
-    model.e_start_end2 =pyo.Constraint(expr = model.e_vec2[0]==model.e_vec2[n])
+    # Periodic constraint always holds: SoC(start) == SoC(end) for this year
+    model.e_start_end1 = pyo.Constraint(expr = model.e_vec1[0] == model.e_vec1[n])
+    # Inter-year continuity: if a fixed SoC fraction is supplied, pin the start level
+    if e_start1 is not None:
+        model.e_fix_start1 = pyo.Constraint(expr = model.e_vec1[0] == e_start1)
+    model.e_start_end2 = pyo.Constraint(expr = model.e_vec2[0] == model.e_vec2[n])
 
     model.e_model_charge1 = pyo.Constraint(model.vec_n, rule=rule_e_model_charge1)
     model.e_model_discharge1 = pyo.Constraint(model.vec_n, rule=rule_e_model_discharge1)
@@ -351,6 +355,8 @@ def solve_lp_pyomo(price_ts: TimeSeries, prod1: Production, prod2: Production, s
         except Exception as exc:
             warnings.warn(f"Gap D dual extraction failed: {exc}", RuntimeWarning)
             os_res.dual_prices = None
+
+    os_res.soc_final = pyo.value(model.e_vec1[n])
 
     return os_res
 
