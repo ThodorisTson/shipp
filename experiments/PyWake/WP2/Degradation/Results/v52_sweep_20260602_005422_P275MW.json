@@ -1,0 +1,20 @@
+{
+  "version": "v5.2",
+  "revenue_basis": "battery-only (total plant minus wind-only baseline)",
+  "E_CAP_GRID": [
+    600,
+    700,
+    800
+  ],
+  "P_CAP_SWEEP": 275,
+  "N_YEARS": 20,
+  "discount_rate": 0.03,
+  "soc_min": 0.1,
+  "soc_max": 0.9,
+  "eta_out": 0.8774068899999999,
+  "e_cost_eur_kwh": 245.0,
+  "k3": 3.241779477729208e-05,
+  "k4": 1.178528617001297,
+  "RUN_HOURS": 8760,
+  "EOL_REPLACEMENT": 0.7
+}

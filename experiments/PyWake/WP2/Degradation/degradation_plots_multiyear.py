@@ -3,10 +3,8 @@ degradation_plots_multiyear.py
 ==============================
 Standalone plotting module for multi-year battery degradation results.
  
-Contains all visualisation functions that consume the `multiyear` result
-dict produced by `_run_multiyear()` in the run script. Separated from the
-run script so plots can be edited, iterated, or re-run without touching
-any physics or LP logic.
+Contains all visualisation functions that consume the `multiyear` result dict produced by `_run_multiyear()` in the run script. Separated from the run script so plots can be edited, iterated, 
+or re-run without touching any physics or LP logic.
  
 Functions
 ---------
@@ -15,9 +13,7 @@ Functions
     plot_subgradient_timeseries — 2-panel subgradient vs SoC time series
     plot_multiyear_trajectory — 2×2 multi-year degradation summary figure
  
-All three plot functions accept `plots_dir`, `n_years`, `eol_replacement`,
-and `show` as explicit arguments so this module has no dependency on the
-CONFIG block of the run script.
+All three plot functions accept `plots_dir`, `n_years`, `eol_replacement`, and `show` as explicit arguments so this module has no dependency on the CONFIG block of the run script.
 """
  
 from __future__ import annotations
@@ -134,7 +130,7 @@ def plot_gradient_analysis(
     mean_g = np.mean(valid_dDeg) if valid_dDeg else 0.0
     ax.axhline(mean_g, linestyle="--", linewidth=1.2, color="#2c3e50", alpha=0.8)
     ax.set_xlabel("Project year")
-    ax.set_ylabel("dDeg/dDoD  [USD / MWh]")
+    ax.set_ylabel("dDeg/dDoD  [EUR / MWh]")
     ax.set_title("dDeg/dDoD per Year") #red = high-alignment regime, blue = low-alignment regime
     ax.set_xlim(0.5, n_years + 0.5)
     ax.set_xticks(range(2, n_years + 1, 2))
@@ -173,7 +169,7 @@ def plot_gradient_analysis(
     ax.axvline(ALIGN_THRESHOLD, linestyle=":", linewidth=1.2,
                color="grey", alpha=0.6, label=f"Regime boundary = {ALIGN_THRESHOLD:.0f}")
     ax.set_xlabel("Alignment factor  =  dDeg/dDoD / (e_cap × |subgrad| × |dual|)")
-    ax.set_ylabel("dDeg/dDoD  [USD / MWh]")
+    ax.set_ylabel("dDeg/dDoD  [EUR / MWh]")
     ax.legend(fontsize=8)
     ax.grid(True, alpha=0.25)
 
@@ -185,7 +181,7 @@ def plot_gradient_analysis(
     for yr in multiyear["replacement_years"]:
         ax.axvline(yr + 0.5, linestyle="-.", linewidth=1.4, color="red", alpha=0.8)
     ax.set_xlabel("Project year")
-    ax.set_ylabel("mean |subgrad_combined|  [USD / MWh]")
+    ax.set_ylabel("mean |subgrad_combined|  [EUR / MWh]")
     ax.set_xlim(0.5, n_years + 0.5)
     ax.set_xticks(range(2, n_years + 1, 2))
     ax.grid(True, alpha=0.25, axis="y")
@@ -263,7 +259,7 @@ def plot_subgradient_timeseries(
 ) -> None:
     """Two-panel subgradient time series: year 1 vs EoL year.
  
-    Left axis: per-timestep subgrad_combined [USD/MWh].
+    Left axis: per-timestep subgrad_combined [EUR/MWh].
     Right axis: SoC [MWh].
     Panel label includes SoH and dDeg/dDoD for that year.
     """
@@ -288,7 +284,7 @@ def plot_subgradient_timeseries(
  
     fig, axes = plt.subplots(2, 1, figsize=(14, 8), sharex=True)
     fig.suptitle(
-        f"Subgradient Time Series : Year 1 vs Year {panel_years[1]}",   # Note: left axis = per-timestep subgradient [USD/MWh]; right axis = SoC [MWh]
+        f"Subgradient Time Series : Year 1 vs Year {panel_years[1]}",   # Note: left axis = per-timestep subgradient [EUR/MWh]; right axis = SoC [MWh]
         fontsize=11, y=1.01,                                            # Note: comparing year 1 (fresh battery) vs EoL year (degraded capacity)
     )
 
@@ -308,7 +304,7 @@ def plot_subgradient_timeseries(
         # Left axis,  subgradient
         ax.plot(t, subgrad, linewidth=0.6, color=col, alpha=0.85,
                 label=f"yr {yr}  |  SoH = {soh_p:.1f}%  |  dDeg/dDoD = {grad_val:.2e}")
-        ax.set_ylabel("subgrad_combined\n[USD / MWh]", color=col)
+        ax.set_ylabel("subgrad_combined\n[EUR / MWh]", color=col)
         ax.tick_params(axis="y", labelcolor=col)
         ax.axhline(0, linewidth=0.8, color="grey", linestyle="--", alpha=0.5)
         ax.grid(True, alpha=0.20)

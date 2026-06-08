@@ -247,6 +247,8 @@ def solve_lp_pyomo(price_ts: TimeSeries, prod1: Production, prod2: Production, s
     # Gap D: declare dual Suffix BEFORE solve so the solver populates shadow prices
     if return_duals:
         model.dual = pyo.Suffix(direction=pyo.Suffix.IMPORT)
+        model.rc   = pyo.Suffix(direction=pyo.Suffix.IMPORT)   # reduced costs for e_cap1 cross-check
+
 
     if verbose:
         results = pyo.SolverFactory(name_solver).solve(model, tee = True)
@@ -344,6 +346,7 @@ def solve_lp_pyomo(price_ts: TimeSeries, prod1: Production, prod2: Production, s
             dual_e_max1     = np.array([model.dual.get(model.e_max1[i],              0.0) for i in range(n)])
             dual_charge1    = np.array([model.dual.get(model.e_model_charge1[i],     0.0) for i in range(n)])
             dual_discharge1 = np.array([model.dual.get(model.e_model_discharge1[i],  0.0) for i in range(n)])
+            rc_e_cap1       = float(model.rc.get(model.e_cap1, 0.0))
             os_res.dual_prices = {
                 "dual_e_min1":     dual_e_min1,      # PRIMARY for chain rule
                 "dual_e_max1":     dual_e_max1,      # upper SoC bound
@@ -351,6 +354,7 @@ def solve_lp_pyomo(price_ts: TimeSeries, prod1: Production, prod2: Production, s
                 "dual_discharge1": dual_discharge1,  # dynamics (discharging active)
                 "dual_energy1":    dual_charge1 + dual_discharge1,  # net dynamics
                 "e_cap1":          float(pyo.value(model.e_cap1)),  # for scaling
+                "rc_e_cap1":       rc_e_cap1,        # reduced cost = dObj/de_cap1 (cross-check)
             }
         except Exception as exc:
             warnings.warn(f"Gap D dual extraction failed: {exc}", RuntimeWarning)

@@ -9,11 +9,9 @@ Design principle
 YAML files store DATA only (raw ERA5 time series, turbine Cp/Ct tables,
 battery specs, cable topology).  This module computes everything else:
 
-  1. Weibull fitting       – fit 2-parameter Weibull per directional sector
-                             from raw ERA5 hourly wind speeds
+  1. Weibull fitting       – fit 2-parameter Weibull per directional sector from raw ERA5 hourly wind speeds
   2. Shear scaling         – scale Weibull A from h_ref to hub height
-  3. Power curve           – derive P(v) from Cp curve:
-                             P = Cp × ½ρ(πD²/4)v³, capped at rated_power
+  3. Power curve           – derive P(v) from Cp curve: P = Cp × ½ρ(πD²/4)v³, capped at rated_power
   4. PyWake objects        – XRSite + WindTurbine ready to hand to any model
 
 Entry point
@@ -307,8 +305,7 @@ def load_layout(hpp: dict, verbose: bool = True) -> tuple[np.ndarray, np.ndarray
     """
     Read turbine layout from WP2_Wind_Farm.yaml.
 
-    UTM Zone 32N coordinates are centred to (0, 0) to avoid floating-point
-    precision issues in PyWake with large absolute coordinate values.
+    UTM Zone 32N coordinates are centred to (0, 0) to avoid floating-point precision issues in PyWake with large absolute coordinate values.
 
     Returns
     -------
@@ -360,12 +357,14 @@ def load_battery(hpp: dict, verbose: bool = True) -> dict:
         'soc_max':              float(lim.get('soc_max', 0.90)),
         'soc_initial':          float(lim.get('soc_initial', 0.50)),
         'dod':                  float(lim.get('dod', 0.80)),
-        'chemistry':            deg.get('chemistry', 'LFP'),
+        'chemistry':            deg.get('chemistry', 'LMO'),
         'eol_capacity_fraction': float(deg.get('eol_capacity_fraction', 0.80)),
         'temperature_C':         float(deg.get('temperature_C', 25.0)),
         'capex_EUR_per_kWh':     float(eco.get('capex_EUR_per_kWh', 150.0)),
         'capex_EUR_per_kW':      float(eco.get('capex_EUR_per_kW', 100.0)),
-        'opex_EUR_per_kWh_year': float(eco.get('opex_EUR_per_kWh_year', 7.0)),
+        'repl_energy_EUR_per_kWh': float(eco.get('repl_energy_EUR_per_kWh', 72.0)),   # energy expansion (replacement + deg valuation)
+        'repl_power_EUR_per_kW':   float(eco.get('repl_power_EUR_per_kW',   96.0)),    # power expansion (replacement only)
+        'opex_EUR_per_kW_year': float(eco.get('opex_EUR_per_kW_year', 7.0)),
         'lifetime_years':        float(eco.get('lifetime_years', 15.0)),
     }
 
@@ -435,8 +434,7 @@ def build_pywake_objects(
     """
     Build PyWake XRSite and WindTurbine objects.
 
-    Weibull A is scaled from h_ref (where ERA5 is given) to hub height
-    using the power-law shear stored in the wind resource dict.
+    Weibull A is scaled from h_ref (where ERA5 is given) to hub height using the power-law shear stored in the wind resource dict.
 
     Parameters
     ----------
@@ -654,8 +652,7 @@ def run_pywake_timeseries(
     """
     Run PyWake time series simulation using ERA5 hourly data.
 
-    This is the bridge function to SHIPP: it produces the hourly wind power
-    time series that SHIPP needs for battery optimization.
+    This is the bridge function to SHIPP: it produces the hourly wind power time series that SHIPP needs for battery optimization.
 
     Parameters
     ----------

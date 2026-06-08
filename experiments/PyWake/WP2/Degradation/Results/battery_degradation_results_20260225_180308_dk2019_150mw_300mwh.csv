@@ -1,2 +1,0 @@
-timestamp,hours_simulated,days_simulated,case,total_cycles_efc,cycles_per_year,fd_total,fd_cycle,fd_calendar,soh_pct,capacity_fade_pct,e_cap_degraded_MWh,p_cap_degraded_MW,mean_dod_pct,mean_soc_pct,n_rainflow_cycles,model
-2026-02-25 18:04:04,8760,365.0,dispatch_fixed,303.9269307738172,303.9269307738172,0.027508070431795054,0.013596578892798611,0.013911491538996441,91.89882296860247,8.101177031397523,275.6964689058074,137.8482344529037,56.8236058499242,58.24427568997431,611.0,Xu2016_LMO

@@ -1,0 +1,2 @@
+timestamp,run_label,year,soh_pct,fd_annual,fd_cycle,fd_calendar,fd_calendar_pct,fd_cumulative,n_replacements,replacement_this_year,dDeg_dDoD_DEPRECATED,mean_abs_subgrad,mean_dod,mean_abs_dual,e_cap_eff,cycle_coverage,dRev_dEcap,dDegCost_dEcap,lambda_E,dNPV_dEcap,rc_e_cap1
+2026-05-25 17:25:45,20260525_172452_dk2022_150mw_300mwh_soc10_90_v5,1,93.016,0.019231,0.000548,0.018683,97.1,0.019231,0,False,,0.02562,0.8,,300.0,1.0,0.0,-0.0,177000.0,-177000.0,-177000.0
