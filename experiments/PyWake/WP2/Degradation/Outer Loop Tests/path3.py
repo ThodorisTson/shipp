@@ -2,10 +2,8 @@
 Path 3 — Degradation-Aware NLP Dispatch (Canonical Runner)
 ===========================================================
 
-Monolithic NLP that embeds rainflow Shi degradation directly into the
-dispatch objective.  Uses SHIPP kernel (build_lp_obj_revenues,
-build_lp_cst_sparse) for the LP baseline, then adds degradation via
-scipy.optimize.minimize with trust-constr or SLSQP.
+Monolithic NLP that embeds rainflow Shi degradation directly into the dispatch objective.  Uses SHIPP kernel (build_lp_obj_revenues,
+build_lp_cst_sparse) for the LP baseline, then adds degradation via scipy.optimize.minimize with trust-constr or SLSQP.
 
 Changes from path3_jenna.py
 ---------------------------
@@ -60,13 +58,16 @@ from scipy.optimize import linprog, minimize, LinearConstraint
 from shipp.kernel import build_lp_obj_revenues, build_lp_cst_sparse
 from shipp.components import Storage
 
-# -- Degradation model imports ---------------------------------------------
+# -- Local module path setup (must precede the wp2 / degradation imports) --
 _SCRIPT_DIR = Path(__file__).parent
 _PARENT_DIR = _SCRIPT_DIR.parent
 
 for p in [str(_SCRIPT_DIR), str(_PARENT_DIR)]:
     if p not in sys.path:
         sys.path.insert(0, p)
+
+from wp2_common import quick_setup, get_wake_model
+from wp2_econ import eta_symmetric
 
 from degradation_xu import (
     XuModelParams,
@@ -168,7 +169,7 @@ def make_nlp_functions(
 ):
     """Return (objective, gradient, state_dict) closures for minimize().
 
-    Two normalisation modes (selected by ``alpha``):
+    Two normalisation modes (selected by "alpha"):
 
     alpha=None  — legacy w_deg mode (default):
         f(x) = (lp_cost + w_deg * f_deg) / obj_scale
@@ -177,10 +178,8 @@ def make_nlp_functions(
     alpha=float — Jenna's dual-normalisation mode:
         f(x) = (1-alpha) * lp_cost / norm_rev
              + alpha     * f_deg   / norm_deg
-        where norm_rev = |dot(vec_obj, x0)| and norm_deg = f_deg(x0)
-        are computed ONCE from the LP solution x0 and held constant.
-        Both terms are O(1) at x0, giving the degradation signal 
-        ``alpha`` weight regardless of the deg/rev ratio of that day.
+        where norm_rev = |dot(vec_obj, x0)| and norm_deg = f_deg(x0) are computed ONCE from the LP solution x0 and held constant.
+        Both terms are O(1) at x0, giving the degradation signal "alpha" weight regardless of the deg/rev ratio of that day.
 
     Parameters
     ----------
@@ -233,8 +232,39 @@ def make_nlp_functions(
 # 3.  LP BUILDER
 # ══════════════════════════════════════════════════════════════════════════
 
-def build_lp_problem(prices: np.ndarray, config: Dict) -> Tuple[Dict, Dict]:
-    """Build SHIPP LP matrices → solve LP → return (lp_mats, lp_data)."""
+def daily_revenue(price, storage_p, curtailed, wind, p_max, dt=1.0) -> Dict:
+    """Single-window UNDISCOUNTED revenue [EUR], two bases (mirrors
+    wp2_econ.revenue_annual but raw, with no annualisation).
+
+        arbitrage : price . storage_p
+        marginal  : price . (wind - curtailed + storage_p) - price . min(wind, p_max)
+
+    With no wind (wind == 0, curtailed == 0) marginal collapses to arbitrage,
+    so the battery-only path keeps its original headline number.
+    """
+    price     = np.asarray(price, float)
+    storage_p = np.asarray(storage_p, float)
+    curtailed = np.asarray(curtailed, float)
+    wind      = np.asarray(wind, float)
+    prod_after_curt = wind - curtailed
+    wind_no_bat     = np.minimum(wind, p_max)
+    arb  = dt * float(np.dot(price, storage_p))
+    marg = dt * (float(np.dot(price, prod_after_curt + storage_p))
+                 - float(np.dot(price, wind_no_bat)))
+    return {"arbitrage": arb, "marginal": marg}
+
+
+def build_lp_problem(prices: np.ndarray, config: Dict,
+                     power_wind: np.ndarray | None = None) -> Tuple[Dict, Dict]:
+    """Build SHIPP LP matrices → solve LP → return (lp_mats, lp_data).
+
+    power_wind : wind-farm production [MW] for this slice, or None for the legacy battery-only arbitrage problem.
+
+    Grid bounds are mode-dependent:
+      battery-only (power_wind is None) : grid in [-P_CAP, P_CAP] (legacy; charges from the grid - the only source when there is no wind).
+      wind (power_wind given)           : grid in [p_min_grid, p_max_grid] with p_min_grid = 0, so the battery charges ONLY from wind surplus and
+                                          export is capped at the grid connection (matches Plan B / v5.4).
+    """
     E_CAP   = config["e_cap"]
     P_CAP   = config["p_cap"]
     SOC_MIN = config["soc_min"]
@@ -250,13 +280,21 @@ def build_lp_problem(prices: np.ndarray, config: Dict) -> Tuple[Dict, Dict]:
     stor_null = Storage(e_cap=0, p_cap=0, eff_in=1, eff_out=1,
                         e_cost=0, p_cost=0)
 
-    power   = np.zeros(T)
+    if power_wind is None:
+        power      = np.zeros(T)
+        grid_p_min = -P_CAP
+        grid_p_max =  P_CAP
+    else:
+        power      = np.asarray(power_wind, dtype=float)[:T]
+        grid_p_min = float(config.get("p_min_grid", 0.0))
+        grid_p_max = float(config["p_max_grid"])
+
     options = dict(formulation='lp_alt', fixed_cap=True)
 
     vec_obj = build_lp_obj_revenues(prices, T, options)
     mat_eq, vec_eq, mat_ineq, vec_ineq, bounds_lower, bounds_upper = \
         build_lp_cst_sparse(
-            power, dt, -P_CAP, P_CAP, T,
+            power, dt, grid_p_min, grid_p_max, T,
             stor, stor_null,
             stor1_p_cap_max=P_CAP, stor2_p_cap_max=0,
             stor1_e_cap_max=E_CAP, stor2_e_cap_max=0,
@@ -283,15 +321,20 @@ def build_lp_problem(prices: np.ndarray, config: Dict) -> Tuple[Dict, Dict]:
     print(f"{t_lp:.1f} s")
 
     x_lp = res_lp.x
-    lp_revenue = float(np.sum(prices[:T] * x_lp[0:T] * dt))
+    c_slice = slice(2*T, 3*T)                       # p_curtailed (lp_alt layout)
+    rev_lp  = daily_revenue(prices[:T], x_lp[0:T], x_lp[c_slice],
+                            power, float(config["p_max_grid"]), dt)
 
     lp_mats = dict(
         vec_obj=vec_obj, mat_eq=mat_eq, vec_eq=vec_eq,
         mat_ineq=mat_ineq, vec_ineq=vec_ineq,
-        bounds_list=bounds_list, e1_slice=e1_slice,
+        bounds_list=bounds_list, e1_slice=e1_slice, c_slice=c_slice,
         T=T, x_lp=x_lp, t_lp=t_lp,
     )
-    lp_data = dict(p=x_lp[0:T], e=x_lp[e1_slice], revenue=lp_revenue)
+    lp_data = dict(
+        p=x_lp[0:T], e=x_lp[e1_slice], curtailed=x_lp[c_slice], wind=power,
+        revenue=rev_lp["marginal"], revenue_arbitrage=rev_lp["arbitrage"],
+    )
     return lp_mats, lp_data
 
 
@@ -313,13 +356,13 @@ def run_single_period(
     use_scaling: bool = True,
     hess_method: str | None = None,
     alpha: float | None = None,
+    power_wind: np.ndarray | None = None,
     verbose: bool = True,
+    make_plots: bool = True,
 ) -> Dict:
-    """Full LP → NLP pipeline for one price slice.
+    
+    #Full LP → NLP pipeline for one price slice. This function is horizon-agnostic: it works identically whether "prices" contains 24, 168, 720, or 8760 hours.
 
-    This function is horizon-agnostic: it works identically whether
-    ``prices`` contains 24, 168, 720, or 8760 hours.
-    """
     E_CAP = config["e_cap"]
     B     = config["replacement_cost"]
     dt    = config["dt"]
@@ -331,7 +374,7 @@ def run_single_period(
           f"range=[{prices.min():.1f}, {prices.max():.1f}]")
 
     # ── LP ────────────────────────────────────────────────────────────────
-    lp_mats, lp_data = build_lp_problem(prices, config)
+    lp_mats, lp_data = build_lp_problem(prices, config, power_wind=power_wind)
     print(f"  SHIPP layout: {len(lp_mats['vec_obj'])} vars  (5×{T}+6 = {5*T+6})")
 
     f_lp, cyc_lp = compute_f_deg(lp_data["e"], E_CAP, shi_fit)
@@ -396,8 +439,7 @@ def run_single_period(
             obj_sc  = float(getattr(opt_state, 'fun', float('nan')))
             cv      = float(getattr(opt_state, 'constr_violation', float('nan')))
             opt_val = float(getattr(opt_state, 'optimality', float('nan')))
-            # obj: always store as alpha-weighted value or w_deg-scaled value
-            # for the convergence plot; cross-run EUR comparison uses summary fields
+            # obj: always store as alpha-weighted value or w_deg-scaled value for the convergence plot; cross-run EUR comparison uses summary fields
             _history.append(dict(
                 iter=_iter["n"],
                 obj=obj_sc * obj_scale,
@@ -418,8 +460,7 @@ def run_single_period(
             maxiter=max_iter,
             xtol=1e-12,      # prevent early xtol termination; solver stops at gtol or maxiter
             initial_tr_radius=tr_radius if tr_radius is not None else 0.1,
-            # 0.1 = Jenna's conservative default; avoids the large infeasible
-            # excursion in early iterations that wastes budget on recovery
+            # 0.1 = Jenna's conservative default; avoids the large infeasible excursion in early iterations that wastes budget on recovery
         )
 
         kw = dict(
@@ -477,7 +518,10 @@ def run_single_period(
     x_nlp = res_nlp.x
     nlp_p = x_nlp[0:T]
     nlp_e = x_nlp[lp_mats["e1_slice"]]
-    nlp_revenue = float(np.sum(prices[:T] * nlp_p * dt))
+    nlp_c = x_nlp[lp_mats["c_slice"]]
+    rev_nlp_d   = daily_revenue(prices[:T], nlp_p, nlp_c, lp_data["wind"],
+                                float(config["p_max_grid"]), dt)
+    nlp_revenue = rev_nlp_d["marginal"]
 
     f_nlp, cyc_nlp = compute_f_deg(nlp_e, E_CAP, shi_fit)
     deg_cost_nlp = w_deg * f_nlp
@@ -510,8 +554,9 @@ def run_single_period(
               f"Ratio: {sav/sac:.2f}x")
 
     nlp_result = dict(
-        p=nlp_p, e=nlp_e,
-        revenue=nlp_revenue, f_deg=f_nlp,
+        p=nlp_p, e=nlp_e, curtailed=nlp_c, wind=lp_data["wind"],
+        revenue=nlp_revenue, revenue_arbitrage=rev_nlp_d["arbitrage"],
+        f_deg=f_nlp,
         deg_cost_EUR=deg_cost_nlp, n_cycles=len(cyc_nlp),
         status_msg=res_nlp.message, n_iter=res_nlp.nit,
         history=_history,
@@ -522,6 +567,7 @@ def run_single_period(
         lp_data, nlp_result, prices, config,
         {"LP": lp_mats["t_lp"], "NLP": t_nlp},
         solver_info=solver_label, obj_scale=obj_scale, alpha=alpha,
+        make_plots=make_plots,
     )
 
     return nlp_result
@@ -534,7 +580,7 @@ def run_single_period(
 def _save_results(
     results_dir, prefix, year, period_label,
     lp_data, nlp_result, prices, config, timings,
-    solver_info="", obj_scale=1.0, alpha=None,
+    solver_info="", obj_scale=1.0, alpha=None, make_plots=True,
 ):
     results_dir.mkdir(exist_ok=True)
     T = len(prices)
@@ -554,7 +600,10 @@ def _save_results(
     np.savez_compressed(
         npz_path,
         lp_e=lp_data["e"], lp_p=lp_data["p"],
+        lp_curtailed=lp_data.get("curtailed", np.zeros(T)),
         nlp_e=nlp_result["e"], nlp_p=nlp_result["p"],
+        nlp_curtailed=nlp_result.get("curtailed", np.zeros(T)),
+        wind=lp_data.get("wind", np.zeros(T)),
         prices=prices,
     )
     print(f"  Saved: {npz_path.name}")
@@ -570,6 +619,9 @@ def _save_results(
         alpha=alpha,
         lp_revenue=round(rev_lp, 2),
         nlp_revenue=round(rev_nlp, 2),
+        lp_revenue_arbitrage=round(lp_data.get("revenue_arbitrage", rev_lp), 2),
+        nlp_revenue_arbitrage=round(nlp_result.get("revenue_arbitrage", rev_nlp), 2),
+        wind_mode=bool(config.get("wind_mode", False)),
         lp_deg_cost=round(deg_lp, 2),
         nlp_deg_cost=round(deg_nlp, 2),
         lp_net=round(net_lp, 2),
@@ -606,6 +658,8 @@ def _save_results(
               f"Ratio: {sav/sac:.2f}x")
 
     # ── 4. Comparison plot (3 panels) ─────────────────────────────────────
+    if not make_plots:
+        return
     try:
         import matplotlib
         matplotlib.use("Agg")
@@ -794,7 +848,7 @@ def slot_hour_range(slot_key: str) -> Tuple[int, int, str]:
 # ══════════════════════════════════════════════════════════════════════════
 
 def load_dk1_prices(year: int) -> np.ndarray:
-    """Load 8760 hourly DK1 prices for ``year`` from CSV."""
+    """Load 8760 hourly DK1 prices for "year" from CSV."""
     for base in [_SCRIPT_DIR, _PARENT_DIR, _SCRIPT_DIR.parent]:
         csv_path = base / f"dk1_prices_{year}.csv"
         if csv_path.exists():
@@ -821,6 +875,37 @@ def load_dk1_prices(year: int) -> np.ndarray:
         prices[np.isnan(prices)] = np.nanmean(prices)
 
     return prices
+
+
+def compute_wind_power(setup: dict, n_hours: int = 8760) -> np.ndarray:
+    """Full-year wind-farm power [MW] via the same PyWake pipeline as Plan B /
+    v5.4 (Bastankhah + Crespo-Hernandez, ERA5 resource from the HPP YAML)."""
+    import xarray as xr
+    from py_wake.site import XRSite
+
+    ts = setup["hpp"]["site"]["energy_resource"]["time_series"]["wind_resource"]
+    ws = np.asarray(ts["wind_speed"], dtype=float)
+    wd = np.asarray(ts["wind_direction"], dtype=float)
+    ti_dat = ts.get("turbulence_intensity")
+    ti = None
+    if isinstance(ti_dat, dict) and "data" in ti_dat:
+        ti = np.asarray(ti_dat["data"], dtype=float)
+        if ti.shape != ws.shape:
+            ti = None
+
+    n = min(n_hours, len(ws))
+    ws, wd = ws[:n], wd[:n]
+    if ti is not None:
+        ti = ti[:n]
+
+    site = XRSite(ds=xr.Dataset(data_vars=dict(P=1)))
+    wf_model = get_wake_model("Bastankhah", site, setup["windturbine"])
+    kwargs = {"x": setup["x"], "y": setup["y"],
+              "wd": wd, "ws": ws, "time": np.arange(n) / 24.0}
+    if ti is not None:
+        kwargs["TI"] = ti
+    sim_res = wf_model(**kwargs)
+    return sim_res.Power.sum(["wt"]).values / 1e6
 
 
 # ══════════════════════════════════════════════════════════════════════════
@@ -879,8 +964,23 @@ Examples:
                              "Suggested starting value: 0.2")
 
     # ── Misc ──────────────────────────────────────────────────────────────
+    parser.add_argument("--e-cap", type=float, default=None,
+                        help="Energy capacity [MWh] override (default: YAML). "
+                             "Use 550 for the degraded-optimum comparison.")
+    parser.add_argument("--p-cap", type=float, default=None,
+                        help="Power capacity [MW] override (default: YAML). "
+                             "Use 175 for the degraded-optimum comparison.")
+    parser.add_argument("--wind", action="store_true",
+                        help="HPP mode: wind production + curtailment, P_MIN=0 "
+                             "(battery charges only from wind surplus, matches "
+                             "Plan B / v5.4). Default OFF = battery-only arbitrage, "
+                             "which reproduces the existing converged runs.")
+
     parser.add_argument("--test", action="store_true",
                         help="Synthetic 24h test")
+    parser.add_argument("--all-days", action="store_true",
+                        help="Run every day of the year (plots OFF, quiet) into "
+                             "Results_Path3_AllDays/run_<ts>/. For the upside distribution.")
     args = parser.parse_args()
 
     use_scaling = not args.no_scale
@@ -913,14 +1013,32 @@ Examples:
     print("=" * 72)
 
     # ── Battery configuration ─────────────────────────────────────────────
-    config = dict(
-        e_cap=300.0, p_cap=150.0,
-        soc_min=0.10, soc_max=0.90,
-        eff_in=0.95, eff_out=0.95,
-        dt=1.0,
-        replacement_cost=150_000.0,
-    )
+    HPP_YAML = next((p for p in (_SCRIPT_DIR / "WP2_HPP.yaml",
+                                _PARENT_DIR / "WP2_HPP.yaml") if p.exists()), None)
+    if HPP_YAML is None:
+        raise FileNotFoundError("WP2_HPP.yaml not found beside path3.py or its parent")
 
+    setup = quick_setup(HPP_YAML, config={"interp_n": 2000}, verbose=False)
+    bat   = setup["battery"]
+
+    rte_ac = float(bat["rte_nominal"]) * float(bat["pcu_efficiency"]) ** 2   # 0.9025 * 0.986^2 = 0.877
+    eta    = eta_symmetric(rte_ac)                                           # sqrt(0.877) = 0.9367  (was 0.95/0.95, RTE 0.9025, no PCU)
+    print(f"  RTE_ac={rte_ac:.4f}  eta={eta:.4f}   (expect 0.9100 / 0.9539)")
+
+    # (E,P) default to YAML; override at the degraded optimum (e.g. --e-cap 550 --p-cap 175)
+    e_cap = args.e_cap if args.e_cap is not None else bat["energy_capacity_Wh"] / 1e6
+    p_cap = args.p_cap if args.p_cap is not None else bat["power_capacity_W"]   / 1e6
+
+    config = dict(
+        e_cap=e_cap, p_cap=p_cap,
+        soc_min=float(bat["soc_min"]), soc_max=float(bat["soc_max"]),
+        eff_in=eta, eff_out=eta,
+        dt=1.0,
+        replacement_cost=float(bat["repl_energy_EUR_per_kWh"]) * 1000.0,     # 72_000 EUR/MWh  (was hardcoded 150_000)
+        p_max_grid=float(setup["hpp"]["grid_connection_capacity"]) / 1e6,    # grid connection cap [MW]; export limit in wind mode
+        p_min_grid=0.0,                                                      # no grid import in wind mode (matches Plan B / v5.4)
+        wind_mode=bool(args.wind),
+    )
     print(f"\n  Battery: {config['e_cap']} MWh / {config['p_cap']} MW")
     print(f"  SoC: [{config['soc_min']}, {config['soc_max']}]")
     print(f"  w_deg = {config['replacement_cost']*config['e_cap']:,.0f} EUR")
@@ -931,13 +1049,25 @@ Examples:
     )
 
     # ── Dispatch helper ───────────────────────────────────────────────────
-    def _run(prices_slice, label, pfx):
+    wind_full = compute_wind_power(setup) if args.wind else None
+    if args.wind:
+        print(f"  Wind: HPP mode ON  (full-year mean {wind_full.mean():.1f} MW, "
+              f"max {wind_full.max():.1f} MW)  grid cap {config['p_max_grid']:.0f} MW")
+    else:
+        print("  Wind: OFF (battery-only price arbitrage)")
+
+    def _wind_slice(h0, h1):
+        return None if wind_full is None else wind_full[h0:h1]
+
+    def _run(prices_slice, wind_slice, label, pfx,
+             make_plots=True, out_dir=None, verbose=True):
         run_single_period(
             prices_slice, config, shi_fit, args.max_iter,
-            results_dir, pfx, args.year, label,
+            out_dir or results_dir, pfx, args.year, label,
             solver=args.solver, tr_radius=args.tr_radius,
             use_scaling=use_scaling, hess_method=args.hess,
-            alpha=args.alpha,
+            alpha=args.alpha, power_wind=wind_slice,
+            make_plots=make_plots, verbose=verbose,
         )
 
     # ── Synthetic test ────────────────────────────────────────────────────
@@ -947,7 +1077,7 @@ Examples:
         hours = np.arange(T) % 24
         prices = 30 + 20*np.sin(2*np.pi*(hours-6)/24) + rng.normal(0, 5, T)
         prices = np.maximum(prices, 0)
-        _run(prices, f"Test ({T}h)",
+        _run(prices, None, f"Test ({T}h)",
              f"{timestamp}_{_RUNNER_NAME}_test_{solver_tag}")
         return
 
@@ -956,6 +1086,34 @@ Examples:
     print(f"  Loaded {len(prices_full)} hours of DK1 {args.year}")
 
     t_total_start = time.perf_counter()
+
+    # ── Route: --all-days (full year, plots OFF, quiet; upside distribution) ──
+    if args.all_days:
+        days_dir = _SCRIPT_DIR / "Results_Path3_AllDays" / f"run_{timestamp}"
+        days_dir.mkdir(parents=True, exist_ok=True)
+        n_days = len(prices_full) // 24
+        print(f"\n  ALL-DAYS mode: {n_days} days -> {days_dir}  (plots OFF, quiet)")
+        ok, failed = 0, []
+        for day in range(n_days):
+            h0, h1 = day * 24, (day + 1) * 24
+            label = f"D{day+1} (h{h0}-{h1})"
+            pfx = f"{timestamp}_{_RUNNER_NAME}_dk{args.year}_D{day+1:03d}_{solver_tag}"
+            try:
+                _run(prices_full[h0:h1], _wind_slice(h0, h1), label, pfx,
+                     make_plots=False, out_dir=days_dir, verbose=False)
+                ok += 1
+            except Exception as e:
+                failed.append(day + 1)
+                print(f"  [day {day+1:3d}] FAILED: {type(e).__name__}: {e}")
+            if (day + 1) % 25 == 0:
+                el = time.perf_counter() - t_total_start
+                print(f"  ... {day+1}/{n_days} done ({ok} ok, {len(failed)} failed)  "
+                      f"[{el/60:.1f} min]")
+        print(f"\n  ALL-DAYS complete: {ok}/{n_days} ok, {len(failed)} failed")
+        if failed:
+            print(f"  Failed days: {failed}")
+        print(f'  Aggregate with: python aggregate_path3.py --dir "{days_dir}"')
+        return
 
     # ── Route: --slot (named slots + batch groups) ────────────────────────
     if args.slot is not None:
@@ -971,7 +1129,7 @@ Examples:
             print(f"\n{'---'*24}")
             print(f"  Slot {sk}: {slabel}  ({h1-h0} hours)")
             print(f"{'---'*24}")
-            _run(prices_full[h0:h1], label, pfx)
+            _run(prices_full[h0:h1], _wind_slice(h0, h1), label, pfx)
 
     # ── Route: --start-hour (arbitrary range) ─────────────────────────────
     elif args.start_hour is not None:
@@ -980,12 +1138,12 @@ Examples:
         label = f"Custom h{h0}-{h1} ({h1-h0}h)"
         pfx = (f"{timestamp}_{_RUNNER_NAME}_dk{args.year}"
                f"_h{h0}_{h1-h0}h_{solver_tag}")
-        _run(prices_full[h0:h1], label, pfx)
+        _run(prices_full[h0:h1], _wind_slice(h0, h1), label, pfx)
 
     # ── Route: --month ────────────────────────────────────────────────────
     elif args.month is not None:
         if args.month == "full":
-            _run(prices_full, "Full Year",
+            _run(prices_full, _wind_slice(0, len(prices_full)), "Full Year",
                  f"{timestamp}_{_RUNNER_NAME}_dk{args.year}_full_{solver_tag}")
 
         elif args.month == "all":
@@ -997,7 +1155,7 @@ Examples:
                 print(f"\n{'---'*24}")
                 print(f"  Month {m}/12: {_MONTH_NAMES[m-1]}")
                 print(f"{'---'*24}")
-                _run(prices_full[h0:h1], label, pfx)
+                _run(prices_full[h0:h1], _wind_slice(h0, h1), label, pfx)
         else:
             m = int(args.month)
             if not 1 <= m <= 12:
@@ -1006,7 +1164,7 @@ Examples:
             label = f"{_MONTH_NAMES[m-1]} (h{h0}-{h1})"
             pfx = (f"{timestamp}_{_RUNNER_NAME}_dk{args.year}"
                    f"_m{m:02d}_{solver_tag}")
-            _run(prices_full[h0:h1], label, pfx)
+            _run(prices_full[h0:h1], _wind_slice(h0, h1), label, pfx)
 
     else:
         parser.error("Specify --slot, --month, or --start-hour")

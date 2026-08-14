@@ -547,7 +547,7 @@ def get_wake_model(model_name: str, site, windturbine, **kwargs):
     elif name == 'BASTANKHAH':
         return Bastankhah_PorteAgel_2014(
             site, windturbine,
-            k=0.0324809,                    # offshore literature value
+            k=0.0572, # via the Niayifar–Porté-Agel relation k* = 0.38 I + 0.004 with I=0.14
             **shared_config,
             **kwargs,
         )

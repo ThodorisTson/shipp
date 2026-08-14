@@ -1,2 +1,0 @@
-timestamp,case,model,calendar_correction,fd_total,fd_cycle,fd_calendar,fd_calendar_pct,soh_pct,capacity_fade_pct,e_cap_degraded_MWh,total_cycles_efc,n_rainflow_cycles,mean_dod_pct,mean_soc_pct,eol_80_yr,eol_70_yr,eol_60_yr
-2026-04-03 01:40:50,dispatch_fixed,Shi2018_polynomial_SEI,Xu ft_calendar added to Shi reporting path (dual-Phi: gradient unchanged),0.02441994082636189,0.011629593553942316,0.012790347272419574,52.37665137424124,92.2758037810667,7.724196218933299,276.8274113432001,333.142854880927,719.0,52.92658054832062,54.29065411907771,6.71,12.18,18.49

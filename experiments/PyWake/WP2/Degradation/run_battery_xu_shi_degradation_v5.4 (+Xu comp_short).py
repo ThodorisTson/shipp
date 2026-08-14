@@ -46,9 +46,14 @@ from degradation_xu import (
     fc_cycle,                 # Xu per-cycle stress  S_delta * S_soc * S_temp
     phi_shi_with_stress,      # fitted Shi per-cycle  k3*delta^k4 * S_soc * S_temp
     compute_fd,               # full Xu fd: (fd, fd_cycle, fd_calendar)
+    fit_shi_polynomial,       # was re-exported by degradation_subgradient before
+                              # that module was rewritten; imported from its
+                              # defining module now. degradation_shi has an
+                              # identical copy; this one matches the
+                              # ShiPolynomialFit that compute_subgradient expects.
 )
 from degradation_shi import analyze_degradation_shi, phi_shi_prime_with_stress
-from degradation_subgradient import compute_subgradient, fit_shi_polynomial
+from degradation_subgradient import compute_subgradient
 from wp2_econ import (eta_symmetric, capex, replacement_cost, annuity_factor,
                       discount_weights, degradation_cost, revenue_annual, HEADLINE_BASIS)
 
@@ -93,20 +98,22 @@ EOL_REPLACEMENT  = 0.70
 EOL_REPLACEMENT_TOL = 0.005
 
 # ── Sweep verbosity ───────────────────────────────────────
-# False -> one-line summary per DoD window; True -> full per-year detail.
-SWEEP_VERBOSE = False
+# False -> one-line summary per DoD window; True -> full per-year detail. True is required to capture the per-year SoH trajectory in the log, which is
+# what the replacement-year threshold check in the results chapter needs.
+SWEEP_VERBOSE = True
 
 run_ts   = datetime.now().strftime('%Y%m%d_%H%M%S')
 FILE_TAG = "v54"
 
 # ── v5.4 DoD sweep configuration ─────────────────────────────
 # (E, P) FIXED for the DoD study, as an OVERWRITE of the YAML read. None on either falls back to the YAML value. All (E, P) exploration happens in Plan B.
-E_CAP_FIXED_MWh = 550.0     # Xu lifetime optimum (fine grid). Set 500.0 for the Shi optimum.
-P_CAP_FIXED_MW  = 175.0     # both lifetime sweeps agree on 175 MW
+E_CAP_FIXED_MWh = 550.0     # Xu grid optimum from the refined Plan B pass (sweep 20260704_014612); quadratic vertex E*=560
+P_CAP_FIXED_MW  = 175.0     # same sweep; quadratic vertex P*=182 (Xu) and 183 (Shi)
 
 # Two controlled series, parametrized by (center, width): soc_min = center - width/2 ; soc_max = center + width/2
 # WIDTH series  isolates the CYCLING term (Shi/Phi, convex in delta).
-# CENTER series isolates the CALENDAR term (Xu mean-SoC stress, ~50% of fd).
+# CENTER series moves the mean-SoC stress S_sigma, which multiplies BOTH the cycle and the calendar term, so it scales the two together rather than
+# isolating the calendar term.
 DOD_WIDTH_SERIES_CENTER = 0.50
 DOD_WIDTH_SERIES        = [0.40, 0.60, 0.80, 1.00]        # 30-70, 20-80, 10-90, 0-100
 DOD_CENTER_SERIES_WIDTH = 0.80
@@ -306,7 +313,7 @@ def _shi_with_calendar_correction(
 def _xu_full_degradation(storage_p, storage_e, e_cap_eff, T_cell_C, dt_hours) -> Dict:
     """Full Xu model (Xu cycling S_delta + Xu calendar) on a given year's dispatch.
 
-    Same dict interface the multiyear loop consumes from the Shi path: keys "fd",
+    Same dict interface the multiyear loop consumes from the Shi path: keys "fd", 
     "fd_cycle", "fd_calendar" (period values; the loop annualises with *scale). Uses the
     SAME rainflow cycles and the SAME e_cap_eff as the Shi path, so the only difference is
     the cycling stress (Xu S_delta vs fitted Shi k3*delta^k4). The calendar term is Xu in
@@ -510,7 +517,9 @@ def _run_multiyear(
             grad_yr = (
                 dDeg_dDoD_yr, float(np.mean(np.abs(sg_yr["subgrad_combined"]))),
                 mean_dod_yr, float(np.mean(np.abs(dual_per_year_yr))),
-                float(e_cap_yr), float(sg_yr["cycle_coverage"]),
+                float(e_cap_yr), float(np.mean(sg_yr["n_straddled"] > 0)),
+                # Was cycle_coverage from the attribution map, which the rewritten degradation_subgradient removed. The equivalent diagnostic in the
+                # straddle construction is the share of timesteps at which at least one cycle straddles, i.e. at which the gradient is non-zero.
                 sg_yr["subgrad_combined"].copy(),
                 dRev_dEcap_yr, dDegCost_dEcap_yr, lambda_E_yr,
                 dNPV_dEcap_yr, rc_e_cap_yr,
@@ -698,28 +707,27 @@ def _dod_points() -> List[Tuple[str, float, float, str]]:
 
 def _window_diagnostics(soc_year1, e_cap_nominal: float, k3: float, k4: float,
                         T_C: float
-                        ) -> Tuple[float, float, int, float, float, float, float]:
+                        ) -> Tuple[float, float, int, float, float, float, float, float]:
     """Year-1 cycle-depth diagnostics + Shi-vs-Xu cycling fd for one DoD window.
 
-    Returns (mean_dod_wt, frac_count_below_convex, n_cycles, max_dod_obs,
-             frac_fd_below_convex, fd_cycle_shi, fd_cycle_xu).
+    Returns (mean_dod_wt, frac_count_below_convex, n_cycles, max_dod_obs, frac_fd_below_convex, fd_cycle_shi, fd_cycle_xu, frac_fd_below_convex_xu).
+    frac_fd_below_convex_xu : same share measured on the Xu branch. The Shi version understates it, because the surrogate
+                              discounts shallow cycles more than deep ones. The reported degradation path is Xu, so this is
+                              the figure that supports any claim about how much damage the extrapolation region actually carries.
     frac_count_below_convex : share of cycle COUNT with delta < 0.1437 (Xu non-convex).
-    frac_fd_below_convex    : share of Shi cycling FD from those cycles. k4 > 1 down-weights
-                              shallow cycles, so this is far below the count fraction.
-    fd_cycle_shi / fd_cycle_xu : year-1 cycling fd from the fitted Shi Phi and from the pure
-                              Xu S_delta, on the SAME cycles and SAME S_soc*S_temp stress.
-                              Ratio = derivative-free fit-error measure; Xu is valid for
-                              reporting at all delta (only the gradient needs convexity).
+    frac_fd_below_convex    : share of Shi cycling FD from those cycles. k4 > 1 down-weights shallow cycles, so this is far below the count fraction.
+    fd_cycle_shi / fd_cycle_xu : year-1 cycling fd from the fitted Shi Phi and from the pure Xu S_delta, on the SAME cycles and SAME S_soc*S_temp stress.
+                              Ratio = derivative-free fit-error measure; Xu is valid for reporting at all delta (only the gradient needs convexity).
     """
     cyc = rainflow_cycle_counting(np.asarray(soc_year1, dtype=float), e_cap_nominal)
     if not cyc:
-        return 0.0, 0.0, 0, 0.0, 0.0, 0.0, 0.0
+        return 0.0, 0.0, 0, 0.0, 0.0, 0.0, 0.0, 0.0
     dods = np.array([c["dod"]      for c in cyc], dtype=float)
     cnts = np.array([c["count"]    for c in cyc], dtype=float)
     socm = np.array([c["soc_mean"] for c in cyc], dtype=float)
     wsum = float(cnts.sum())
     if wsum <= 0.0:
-        return 0.0, 0.0, len(cyc), float(dods.max()), 0.0, 0.0, 0.0
+        return 0.0, 0.0, len(cyc), float(dods.max()), 0.0, 0.0, 0.0, 0.0
     below      = dods < LMO_NONCONVEX_DELTA
     mean_dod   = float(np.average(dods, weights=cnts))
     frac_below = float(cnts[below].sum() / wsum)
@@ -728,8 +736,9 @@ def _window_diagnostics(soc_year1, e_cap_nominal: float, k3: float, k4: float,
     fd_cycle_shi = float(shi_contrib.sum())
     fd_cycle_xu  = float(xu_contrib.sum())
     frac_fd_below = float(shi_contrib[below].sum() / fd_cycle_shi) if fd_cycle_shi > 0.0 else 0.0
+    frac_fd_below_xu = float(xu_contrib[below].sum() / fd_cycle_xu) if fd_cycle_xu > 0.0 else 0.0
     return (mean_dod, frac_below, len(cyc), float(dods.max()),
-            frac_fd_below, fd_cycle_shi, fd_cycle_xu)
+            frac_fd_below, fd_cycle_shi, fd_cycle_xu, frac_fd_below_xu)
 
 
 def _run_dod_sweep(
@@ -794,6 +803,25 @@ def _run_dod_sweep(
             soc_min=soc_min, soc_max=soc_max, T_cell_C=T_cell_C,
             verbose=SWEEP_VERBOSE, deg_model="shi",
         )
+        # ── Save Year-1 SoC for sigma_effect_real.py (Fig 2.3) ──────────────
+        # Runs only for the 10-90 % reference window.
+        # Filename encodes tile length: _8760h = full year, _720h = test run.
+        # sigma_effect_real.py requires _8760h; it will refuse _720h explicitly.
+        if abs(soc_min - 0.10) < 0.005 and abs(soc_max - 0.90) < 0.005:
+            _n   = len(my_shi["annual_soc"][0])          # 8760 or N_DAYS_TEST*24
+            _nyr = len(my_shi["annual_soc"])              # N_YEARS-1 rows
+            # Year 1 only (shape: (_n,))  — used by sigma_effect_real.py
+            _e_yr1 = np.array(my_shi["annual_soc"][0], dtype=float)
+            np.save(RESULTS_DIR / f"storage_e_yr01_{_n}h.npy", _e_yr1)
+            # All years stacked (shape: (_nyr, _n)) — one row per sim year
+            _e_all = np.stack([np.array(s, dtype=float)
+                                for s in my_shi["annual_soc"]])
+            np.save(RESULTS_DIR / f"storage_e_{N_YEARS}yr_{_n}h_stack.npy", _e_all)
+            # Scalar capacity (unchanged across runs, kept for sigma_effect_real.py)
+            np.save(RESULTS_DIR / "e_cap_fixed.npy", np.array([e_cap_fixed]))
+            print(f"  ✓ storage_e_yr01_{_n}h.npy          ({_n} steps, Year 1)")
+            print(f"  ✓ storage_e_{N_YEARS}yr_{_n}h_stack.npy  ({_nyr}×{_n}, all years)")
+
         my_xu = None
         if COMPARE_XU_MULTIYEAR:
             my_xu = _run_multiyear(
@@ -805,12 +833,13 @@ def _run_dod_sweep(
                 repl_p_EUR_per_MW=repl_p_EUR_per_MW,
                 bat_params=bat_params, shi_fit=shi_fit_w,
                 soc_min=soc_min, soc_max=soc_max, T_cell_C=T_cell_C,
-                verbose=False, deg_model="xu",
+                verbose=SWEEP_VERBOSE, deg_model="xu",
             )
         elapsed = time.perf_counter() - t0
 
         (mean_dod_obs, frac_below, n_cyc, max_dod_obs,
-         frac_fd_below, fd_cycle_shi, fd_cycle_xu) = _window_diagnostics(
+         frac_fd_below, fd_cycle_shi, fd_cycle_xu,
+         frac_fd_below_xu) = _window_diagnostics(
             my_shi["annual_soc"][0], e_cap_fixed, shi_fit_w.k3, shi_fit_w.k4, T_cell_C
         )
         fd_yr1     = my_shi["annual_fd"][0][0]
@@ -854,6 +883,7 @@ def _run_dod_sweep(
             "shi_r2": shi_fit_w.r2, "fit_hi": shi_fit_w.fit_hi,
             "mean_dod_obs": mean_dod_obs, "max_dod_obs": max_dod_obs,
             "frac_below_convex": frac_below, "frac_fd_below_convex": frac_fd_below,
+            "frac_fd_below_convex_xu": frac_fd_below_xu,
             "fd_cycle_shi_yr1": fd_cycle_shi, "fd_cycle_xu_yr1": fd_cycle_xu,
             "fd_cycle_xu_over_shi": (fd_cycle_xu / fd_cycle_shi) if fd_cycle_shi > 0 else nanv,
             "n_cycles_yr1": n_cyc,
@@ -861,11 +891,13 @@ def _run_dod_sweep(
         })
 
         cyc_ratio = (fd_cycle_xu / fd_cycle_shi) if fd_cycle_shi > 0 else float("nan")
-        flag  = "  <-- check: material fd extrapolation" if frac_fd_below > 0.10 else ""
+        flag  = "  <-- check: material fd extrapolation" if frac_fd_below_xu > 0.10 else "" # Flag on the Xu branch: it is the reporting path and the larger of the two.
+
         print(f"  [Shi] NPV={npv_shi*1e-6:>7.1f}M  fd={fd_yr1:.5f}  "
               f"repl={my_shi['n_replacements']}  SoH_end={my_shi['final_soh_pct']:.1f}%  "
               f"mean_dod={mean_dod_obs:.3f}  cyc<0.15={frac_below:.2f} "
-              f"fd<0.15={frac_fd_below:.3f}  yr1Xu/Shi={cyc_ratio:.2f}{flag}")
+              f"fd<0.15={frac_fd_below:.4f} (xu {frac_fd_below_xu:.4f})  "
+              f"yr1Xu/Shi={cyc_ratio:.2f}{flag}")              
         if my_xu is not None:
             print(f"  [Xu ] NPV={npv_xu*1e-6:>7.1f}M  fd={fd_yr1_xu:.5f}  "
                   f"repl={int(nrepl_xu)}  SoH_end={soh_end_xu:.1f}%  "
@@ -920,7 +952,8 @@ def _save_dod_sweep_csv(results: List[Dict], e_cap: float, p_cap: float) -> Path
             "mean_dod_obs":         r["mean_dod_obs"],
             "max_dod_obs":          r["max_dod_obs"],
             "frac_below_convex":    r["frac_below_convex"],
-            "frac_fd_below_convex": r["frac_fd_below_convex"],
+            "frac_fd_below_convex":    r["frac_fd_below_convex"],
+            "frac_fd_below_convex_xu": r["frac_fd_below_convex_xu"],
             "n_cycles_yr1":         r["n_cycles_yr1"],
             "elapsed_s":            r["elapsed_s"],
         }

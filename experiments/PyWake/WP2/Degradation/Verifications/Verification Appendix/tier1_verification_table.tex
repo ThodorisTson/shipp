@@ -1,0 +1,54 @@
+\begin{tabular}{llrrrl}
+\hline\noalign{\smallskip}
+Test & Quantity & Expected & Obtained & Rel. error & Status \\
+\noalign{\smallskip}\hline\noalign{\smallskip}
+T1.0 & count at range 3 & 0.5 & 0.5 & 0.0e+00 & PASS \\
+T1.0 & count at range 4 & 1.5 & 1.5 & 0.0e+00 & PASS \\
+T1.0 & count at range 6 & 0.5 & 0.5 & 0.0e+00 & PASS \\
+T1.0 & count at range 8 & 1 & 1 & 0.0e+00 & PASS \\
+T1.0 & count at range 9 & 0.5 & 0.5 & 0.0e+00 & PASS \\
+T1.0 & number of distinct ranges & 5 & 5 & 0.0e+00 & PASS \\
+T1.1 & rainflow records & 20 & 20 & 0.0e+00 & PASS \\
+T1.1 & total cycle count & 10 & 10 & 0.0e+00 & PASS \\
+T1.1 & cycle depth (all records) & 0.8 & 0.8 & 0.0e+00 & PASS \\
+T1.1 & cycle depth spread & 0 & 0 & 0.0e+00 & PASS \\
+T1.1 & cycle mean SoC (all records) & 0.5 & 0.5 & 0.0e+00 & PASS \\
+T1.1 & record count of every entry & 0.5 & 0.5 & 0.0e+00 & PASS \\
+T1.1 & records matching independent counter & 20 & 20 & 0.0e+00 & PASS \\
+T1.2 & full cycles resolved & 4 & 4 & 0.0e+00 & PASS \\
+T1.2 & half cycles (large excursion) & 2 & 2 & 0.0e+00 & PASS \\
+T1.2 & total cycle count & 5 & 5 & 0.0e+00 & PASS \\
+T1.2 & small cycle 1 depth & 0.1 & 0.1 & 0.0e+00 & PASS \\
+T1.2 & small cycle 1 mean SoC & 0.25 & 0.25 & 0.0e+00 & PASS \\
+T1.2 & small cycle 2 depth & 0.1 & 0.1 & 0.0e+00 & PASS \\
+T1.2 & small cycle 2 mean SoC & 0.35 & 0.35 & 0.0e+00 & PASS \\
+T1.2 & small cycle 3 depth & 0.1 & 0.1 & 0.0e+00 & PASS \\
+T1.2 & small cycle 3 mean SoC & 0.45 & 0.45 & 0.0e+00 & PASS \\
+T1.2 & small cycle 4 depth & 0.1 & 0.1 & 0.0e+00 & PASS \\
+T1.2 & small cycle 4 mean SoC & 0.55 & 0.55 & 0.0e+00 & PASS \\
+T1.2 & large excursion depth & 0.8 & 0.8 & 0.0e+00 & PASS \\
+T1.2 & large excursion mean SoC & 0.5 & 0.5 & 0.0e+00 & PASS \\
+T1.2 & records invariant to ramp sampling & 6 & 6 & 0.0e+00 & PASS \\
+T1.3 & identical records, constant amplitude & 20 & 20 & 0.0e+00 & PASS \\
+T1.3 & identical records, nested & 6 & 6 & 0.0e+00 & PASS \\
+T1.4 & S\_delta(0.80) & 2.97977e-05 & 2.97977e-05 & 1.4e-11 & PASS \\
+T1.4 & f\_d cycle term & 0.000297977 & 0.000297977 & 1.8e-16 & PASS \\
+T1.4 & f\_d calendar term & 0.000179719 & 0.000179719 & 0.0e+00 & PASS \\
+T1.4 & f\_d total & 0.000477696 & 0.000477696 & 2.3e-16 & PASS \\
+T1.4 & S\_T at 25 C & 1 & 1 & 0.0e+00 & PASS \\
+T1.5 & cycle term at sigma=0.50 & 0 & 3.52548e-09 & 3.5e-09 & PASS \\
+T1.5 & calendar term at sigma=0.50 & 0.00107309 & 0.00107309 & 0.0e+00 & PASS \\
+T1.5 & cycle term at sigma=0.70 & 0 & 4.34062e-09 & 4.3e-09 & PASS \\
+T1.5 & calendar term at sigma=0.70 & 0.0013212 & 0.0013212 & 0.0e+00 & PASS \\
+T1.5 & calendar ratio sigma 0.70 / 0.50 & 1.23121 & 1.23121 & 0.0e+00 & PASS \\
+T1.5 & calendar ratio 1440 h / 720 h & 2 & 2 & 0.0e+00 & PASS \\
+T1.6 & f\_cyc ratio 30 / 10 periods & 3 & 3 & 1.0e-15 & PASS \\
+T1.7 & k3 from refit & 3.24178e-05 & 3.24178e-05 & 0.0e+00 & PASS \\
+T1.7 & k4 from refit & 1.17853 & 1.17853 & 0.0e+00 & PASS \\
+T1.7 & convexity margin k4 - 1 & 0.178529 & 0.178529 & 1.6e-16 & PASS \\
+T1.7 & S\_sigma at the window centre & 1 & 1 & 0.0e+00 & PASS \\
+T1.7 & f\_d Shi, cycle only & 0.000249214 & 0.000249214 & 0.0e+00 & PASS \\
+T1.7 & Phi\_shi / S\_delta at delta=0.80 & 0.836354 & 0.836354 & 7.0e-09 & PASS \\
+T1.7 & Phi\_shi / S\_delta at delta=0.10 & 0.689298 & 0.689298 & 1.0e-08 & PASS \\
+\noalign{\smallskip}\hline
+\end{tabular}

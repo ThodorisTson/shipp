@@ -82,8 +82,12 @@ PRICE_CSV = PARENT_DIR / "dk1_prices_2022.csv"
 # E_CAP_GRID = [150, 300, 450, 600, 700, 800, 900, 1000, 1100, 1300, 1500] # 11 points
 # P_CAP_GRID = [75, 125, 175, 200, 225, 250, 275, 325]                   # 8 points
 
-E_CAP_GRID = [450, 500, 550, 600, 650, 700]   # 50-MWh steps across the peak
-P_CAP_GRID = [150, 175, 200, 225]             # 25-MW steps across the peak
+# E_CAP_GRID = [300, 350, 400, 425, 450, 475, 500, 525, 550, 600]   # MWh #old RTE version
+# P_CAP_GRID = [75, 100, 125, 150, 175, 200]                         # MW
+
+E_CAP_GRID = [450, 500, 550, 600, 650, 700, 750]   # 50-MWh steps, peak (600) interior
+P_CAP_GRID = [125, 150, 175, 200, 225, 250]        # 25-MW steps, brackets Xu 175 and Shi 200
+# 7 x 6 = 42 points
 
 # ── Re-plot from a previous CSV run (skip the LP sweep entirely) ─────────
 # Set REPLOT_FROM_LAST = True to automatically find and load the most recent

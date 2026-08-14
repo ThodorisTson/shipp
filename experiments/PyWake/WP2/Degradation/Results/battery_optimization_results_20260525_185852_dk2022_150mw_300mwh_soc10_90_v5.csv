@@ -1,3 +1,0 @@
-timestamp,hours_simulated,days_simulated,optimization_type,revenue_kUSD,revenue_increase_pct,p_cap_MW,e_cap_MWh,npv_MUSD,cycles_per_year,solver,no_battery
-2026-05-25 18:59:10,720,30.0,sizing,173077.26654578082,23.47290101500732,105.2888268,300.0,2413.599914301566,218.21930546219576,gurobi,False
-2026-05-25 18:59:10,720,30.0,dispatch_fixed,173277.34465992413,23.615636255030026,150.0,300.0,2411.1898745765156,226.02428366268953,gurobi,False

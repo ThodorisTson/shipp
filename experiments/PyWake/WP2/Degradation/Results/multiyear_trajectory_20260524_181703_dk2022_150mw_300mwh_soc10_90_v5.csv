@@ -1,3 +1,0 @@
-timestamp,run_label,year,soh_pct,fd_annual,fd_cycle,fd_calendar,fd_calendar_pct,fd_cumulative,n_replacements,replacement_this_year,dDeg_dDoD,mean_abs_subgrad,mean_dod,mean_abs_dual,e_cap_eff,cycle_coverage
-2026-05-24 18:18:44,20260524_181703_dk2022_150mw_300mwh_soc10_90_v5,1,92.2758,0.02442,0.01163,0.01279,52.4,0.02442,0,False,7975269.518755,1.592719,0.5293,4.643752,300.0,1.0
-2026-05-24 18:18:44,20260524_181703_dk2022_150mw_300mwh_soc10_90_v5,2,89.7507,0.024664,0.011882,0.012782,51.8,0.049084,0,False,3969747.670993,1.809519,0.4641,4.75479,276.8274,1.0
